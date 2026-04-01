@@ -7,6 +7,7 @@ const authRoutes    = require('./routes/auth');
 const lessonRoutes  = require('./routes/lessons');
 const quizRoutes    = require('./routes/quizzes');
 const scoreRoutes   = require('./routes/scores');
+const db            = require('./db'); 
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
