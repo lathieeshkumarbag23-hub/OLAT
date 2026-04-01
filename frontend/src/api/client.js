@@ -3,7 +3,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'http://127.0.0.1:8080/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://olat-81kb.onrender.com/api',
 });
 
 // Attach JWT to every outgoing request
