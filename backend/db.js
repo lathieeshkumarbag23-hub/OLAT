@@ -7,10 +7,14 @@ const pool = mysql.createPool({
   user:            process.env.DB_USER     || 'root',
   password:        process.env.DB_PASSWORD || '',
   database:        process.env.DB_NAME     || 'elearning_platform',
+  port:            process.env.DB_PORT     || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   timezone: '+00:00',
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 // Verify connection on startup
