@@ -324,6 +324,44 @@ function QuizCreatorTab() {
     API.get('/lessons').then(r => setLessons(r.data)).catch(console.error);
   }, []);
 
+  // Fetch existing quiz if the selected lesson has one
+  useEffect(() => {
+    if (!lessonId) {
+      setQuizTitle('');
+      setQuestions([defaultQuestion()]);
+      return;
+    }
+
+    setLoading(true);
+    API.get(`/quizzes/${lessonId}`)
+      .then(r => {
+        // If a quiz exists, populate it so the teacher can see it / edit it
+        if (r.data && r.data.questions) {
+          setQuizTitle(r.data.title || '');
+          const loadedQuestions = r.data.questions.map(q => ({
+            text: q.text,
+            timeLimit: q.time_limit,
+            points: q.points,
+            options: [
+              ...q.options.map(o => ({ text: o.text, isCorrect: Boolean(o.is_correct) })),
+              ...Array(Math.max(0, 4 - (q.options?.length || 0))).fill({ text: '', isCorrect: false }) // Pad missing options
+            ].slice(0, 4) // Ensure exact 4 length for UI structure
+          }));
+          setQuestions(loadedQuestions.length > 0 ? loadedQuestions : [defaultQuestion()]);
+        }
+      })
+      .catch((err) => {
+        // 404 means no quiz exists yet, which is fine!
+        if (err.response?.status === 404) {
+          setQuizTitle('');
+          setQuestions([defaultQuestion()]);
+        } else {
+          console.error('Error fetching quiz:', err);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [lessonId]);
+
   const updateQ = (qi, field, val) =>
     setQuestions(prev => prev.map((q, i) => i === qi ? { ...q, [field]: val } : q));
 
@@ -503,7 +541,7 @@ function QuizCreatorTab() {
         <button type="submit" disabled={loading}
           className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold py-2.5 rounded-xl shadow-[0_3px_0_0_#4338ca] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2 text-sm"
         >
-          {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : '🎮 Publish Quiz'}
+          {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : '🎮 Save Quiz'}
         </button>
       </form>
     </div>
