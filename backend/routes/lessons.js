@@ -103,6 +103,56 @@ router.post('/', requireTeacher, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────
+// PUT /api/lessons/:id  — Teacher only (update)
+// Body: { title, description, materials: [{type, title, url}] }
+// ──────────────────────────────────────────────────
+router.put('/:id', requireTeacher, async (req, res) => {
+  const { title, description, materials = [] } = req.body;
+  const lessonId = req.params.id;
+
+  if (!title || !title.trim()) {
+    return res.status(400).json({ error: 'Lesson title is required.' });
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Verify ownership
+    const [[lesson]] = await conn.query('SELECT teacher_id FROM Lessons WHERE id = ?', [lessonId]);
+    if (!lesson) { await conn.rollback(); return res.status(404).json({ error: 'Lesson not found.' }); }
+    if (lesson.teacher_id !== req.user.id) { await conn.rollback(); return res.status(403).json({ error: 'Not your lesson.' }); }
+
+    // Update the lesson fields
+    await conn.query(
+      'UPDATE Lessons SET title = ?, description = ? WHERE id = ?',
+      [title.trim(), description || '', lessonId]
+    );
+
+    // Replace the materials completely (safest/easiest way to sync)
+    await conn.query('DELETE FROM Materials WHERE lesson_id = ?', [lessonId]);
+
+    for (const m of materials) {
+      if (m.url && m.url.trim()) {
+        await conn.query(
+          'INSERT INTO Materials (lesson_id, type, title, url) VALUES (?, ?, ?, ?)',
+          [lessonId, m.type || 'link', m.title || '', m.url.trim()]
+        );
+      }
+    }
+
+    await conn.commit();
+    res.json({ message: 'Lesson updated successfully.' });
+  } catch (err) {
+    await conn.rollback();
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update lesson.' });
+  } finally {
+    conn.release();
+  }
+});
+
+// ──────────────────────────────────────────────────
 // DELETE /api/lessons/:id  — Teacher only (own lesson)
 // ──────────────────────────────────────────────────
 router.delete('/:id', requireTeacher, async (req, res) => {

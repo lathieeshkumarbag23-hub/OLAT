@@ -153,6 +153,8 @@ function LessonBuilderTab() {
   const [fetching,    setFetching]    = useState(true);
   const [toast,       setToast]       = useState(null); // { type, msg }
 
+  const [editLessonId, setEditLessonId] = useState(null);
+
   const fetchLessons = () => {
     setFetching(true);
     API.get('/lessons')
@@ -172,17 +174,50 @@ function LessonBuilderTab() {
   const removeMaterial = (i) =>
     setMaterials(prev => prev.filter((_, idx) => idx !== i));
 
+  const handleEdit = async (lesson) => {
+    setEditLessonId(lesson.id);
+    setTitle(lesson.title);
+    setDescription(lesson.description || '');
+    setLoading(true);
+    try {
+      const { data } = await API.get(`/lessons/${lesson.id}`);
+      if (data.materials && data.materials.length > 0) {
+        setMaterials(data.materials.map(m => ({ type: m.type, title: m.title || '', url: m.url })));
+      } else {
+        setMaterials([{ type: 'video', title: '', url: '' }]);
+      }
+    } catch (err) {
+      showToast('error', 'Failed to fetch lesson details.');
+    } finally {
+      setLoading(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditLessonId(null);
+    setTitle('');
+    setDescription('');
+    setMaterials([{ type: 'video', title: '', url: '' }]);
+  };
+
   const handlePublish = async (e) => {
     e.preventDefault();
     if (!title.trim()) return showToast('error', 'Lesson title is required.');
     setLoading(true);
     try {
-      await API.post('/lessons', { title, description, materials: materials.filter(m => m.url.trim()) });
-      showToast('success', 'Lesson published successfully!');
-      setTitle(''); setDescription(''); setMaterials([{ type: 'video', title: '', url: '' }]);
+      const payload = { title, description, materials: materials.filter(m => m.url.trim()) };
+      if (editLessonId) {
+        await API.put(`/lessons/${editLessonId}`, payload);
+        showToast('success', 'Lesson updated successfully!');
+      } else {
+        await API.post('/lessons', payload);
+        showToast('success', 'Lesson published successfully!');
+      }
+      cancelEdit();
       fetchLessons();
     } catch (err) {
-      showToast('error', err.response?.data?.error || 'Failed to publish lesson.');
+      showToast('error', err.response?.data?.error || `Failed to ${editLessonId ? 'update' : 'publish'} lesson.`);
     } finally {
       setLoading(false);
     }
@@ -193,6 +228,7 @@ function LessonBuilderTab() {
     try {
       await API.delete(`/lessons/${id}`);
       setLessons(prev => prev.filter(l => l.id !== id));
+      if (editLessonId === id) cancelEdit();
       showToast('success', 'Lesson deleted.');
     } catch (err) {
       showToast('error', err.response?.data?.error || 'Failed to delete lesson.');
@@ -224,7 +260,12 @@ function LessonBuilderTab() {
 
       {/* Create Form */}
       <form onSubmit={handlePublish} className="bg-gray-50 rounded-2xl p-6 border border-gray-200 space-y-5">
-        <h3 className="font-bold text-gray-800">Create New Lesson</h3>
+        <div className="flex justify-between items-center">
+          <h3 className="font-bold text-gray-800">{editLessonId ? '✏️ Edit Lesson' : 'Create New Lesson'}</h3>
+          {editLessonId && (
+            <button type="button" onClick={cancelEdit} className="text-xs font-semibold text-gray-500 hover:text-gray-700">Cancel Edit</button>
+          )}
+        </div>
 
         <div>
           <label className="label">Lesson Title *</label>
@@ -267,7 +308,7 @@ function LessonBuilderTab() {
         <button type="submit" disabled={loading}
           className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold py-3 rounded-xl shadow-[0_4px_0_0_#4338ca] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2"
         >
-          {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Publishing...</> : '🚀 Publish Lesson'}
+          {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> {editLessonId ? 'Updating...' : 'Publishing...'}</> : (editLessonId ? '💾 Update Lesson' : '🚀 Publish Lesson')}
         </button>
       </form>
 
@@ -282,9 +323,14 @@ function LessonBuilderTab() {
                   <p className="font-semibold text-gray-800">{l.title}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{l.material_count} materials · {l.has_quiz ? '✅ Quiz attached' : '⚠️ No quiz'}</p>
                 </div>
-                <button onClick={() => handleDelete(l.id)} className="text-gray-300 hover:text-red-500 transition-colors">
-                  <Trash2 className="h-5 w-5" />
-                </button>
+                <div className="flex items-center gap-4">
+                  <button onClick={() => handleEdit(l)} className="text-indigo-400 hover:text-indigo-600 text-sm font-semibold transition-colors">
+                    Edit
+                  </button>
+                  <button onClick={() => handleDelete(l.id)} className="text-gray-300 hover:text-red-500 transition-colors">
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
             ))}
             {lessons.length === 0 && <p className="text-gray-400 text-center py-6">No lessons yet.</p>}
