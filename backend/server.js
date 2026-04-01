@@ -32,6 +32,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Heartbeat ──────────────────────────────────────
+app.get('/', (req, res) => res.json({ 
+  message: '🚀 Online Learning Assessment Tool API is active.',
+  endpoints: ['/api/auth', '/api/lessons', '/api/quizzes', '/api/scores']
+}));
+
+app.get('/api/status', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+
 // ── Routes ───────────────────────────────────────
 app.use('/api/auth',    authRoutes);
 app.use('/api/lessons', lessonRoutes);
@@ -39,7 +47,10 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/scores',  scoreRoutes);
 
 // ── 404 catch-all ────────────────────────────────
-app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
+app.use((req, res) => {
+  console.log('404 Not Found:', req.method, req.originalUrl);
+  res.status(404).json({ error: 'Route not found' });
+});
 
 // ── Global error handler ─────────────────────────
 app.use((err, req, res, next) => {
